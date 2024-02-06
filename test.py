@@ -131,7 +131,7 @@ def eval_ops():
         model.cuda()
 
     sample = test_dataset[0]
-    imgL, imgR, voxel_gt = sample['left'], sample['right'], sample['voxel_grid']
+    imgL, imgR, voxel_gt = sample['left'][None, ...], sample['right'][None, ...], sample['voxel_grid']
     if torch.cuda.is_available():
         imgL = imgL.cuda()
         imgR = imgR.cuda()
