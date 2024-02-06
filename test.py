@@ -39,10 +39,10 @@ def calc_voxel_grid(filtered_cloud, grid_size, voxel_size):
     offsets = np.array([int(9 / voxel_size), int(3 / voxel_size), 0])
     xyz_offset_q = np.clip(xyz_q + offsets, [0, 0, 0], np.array(grid_size) - 1)
     # Setting all voxels containitn a points equal to 1
-    vox_grid[xyz_offset_q[:, 0], xyz_offset_q[:, 1], xyz_offset_q[:, 2]] += 1
+    vox_grid[xyz_offset_q[:, 0], xyz_offset_q[:, 1], xyz_offset_q[:, 2]] = 1
 
     # get back indexes of populated voxels
-    xyz_v = np.asarray(np.where(vox_grid >= 10))
+    xyz_v = np.asarray(np.where(vox_grid == 1))
     cloud_np = np.asarray([(pt - offsets) * voxel_size for pt in xyz_v.T])
     return torch.from_numpy(vox_grid), cloud_np
 
