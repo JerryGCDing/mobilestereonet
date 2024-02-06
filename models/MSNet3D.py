@@ -4,7 +4,7 @@ import math
 import torch.nn as nn
 import torch.utils.data
 import torch.nn.functional as F
-from models.submodule import feature_extraction, MobileV2_Residual_3D, convbn_3d, build_gwc_volume, disparity_regression
+from .submodule import feature_extraction, MobileV2_Residual_3D, convbn_3d, build_gwc_volume, disparity_regression
 
 
 class hourglass3D(nn.Module):

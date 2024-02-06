@@ -4,7 +4,7 @@ import math
 import torch.nn as nn
 import torch.utils.data
 import torch.nn.functional as F
-from models.submodule import feature_extraction, MobileV2_Residual, convbn, interweave_tensors, disparity_regression
+from .submodule import feature_extraction, MobileV2_Residual, convbn, interweave_tensors, disparity_regression
 
 
 class hourglass2D(nn.Module):

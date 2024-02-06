@@ -284,3 +284,56 @@ def model_loss(disp_ests, disp_gt, mask):
     for disp_est, weight in zip(disp_ests, weights):
         all_losses.append(weight * F.smooth_l1_loss(disp_est[mask], disp_gt[mask], reduction='mean'))
     return sum(all_losses)
+
+
+def calc_IoU(pred, gt):
+    intersect = pred*gt
+    total = pred+gt
+    union = total-intersect
+
+    return (intersect.sum() + 1.0) / (union.sum() + 1.0)
+
+
+def eval_metric(voxel_ests, voxel_gt, metric_func, *args, depth_range=None):
+    """
+
+    @param voxel_ests:
+    @param voxel_gt:
+    @param metric_func:
+    @param depth_range:
+    @return: Dict{%{depth_range[0]}: [lv0, lv1, lv2, ...], %{depth_range[1]}: [...], ...}
+    """
+    if depth_range is None:
+        depth_range = [1.]
+
+    out_dict = {}
+    for r in depth_range:
+        out_dict[str(r)] = []
+
+    if isinstance(voxel_ests, torch.Tensor):
+        est_shape = voxel_ests.shape
+        for idx in range(len(voxel_gt) - 1, -1, -1):
+            gt_shape = voxel_gt[idx].shape
+            if est_shape[1] == gt_shape[1] and est_shape[2] == gt_shape[2] and est_shape[3] == gt_shape[3]:
+                for depth_r in depth_range:
+                    z = int(est_shape[-1] * depth_r)
+                    if len(args) == 0:
+                        metric = metric_func(voxel_ests[..., :z], voxel_gt[idx][..., :z])
+                    else:
+                        metric = metric_func(voxel_ests[..., :z], voxel_gt[idx][..., :z], args[0][idx])
+                    out_dict[str(depth_r)].append(metric)
+
+    elif isinstance(voxel_ests[0], torch.Tensor):
+        for idx, voxel_est in enumerate(voxel_ests):
+            for depth_r in depth_range:
+                z = int(voxel_est.shape[-1] * depth_r)
+                if len(args) == 0:
+                    metric = metric_func(voxel_est[..., :z], voxel_gt[idx][..., :z])
+                else:
+                    metric = metric_func(voxel_est[..., :z], voxel_gt[idx][..., :z], args[0][idx])
+                out_dict[str(depth_r)].append(metric)
+
+    else:
+        raise NotImplementedError
+
+    return out_dict

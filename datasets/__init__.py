@@ -1,4 +1,4 @@
-from .dataset import SceneFlowDataset, KITTIDataset, DrivingStereoDataset
+from .dataset import SceneFlowDataset, KITTIDataset, DrivingStereoDataset, VoxelDSDatasetCalib
 
 __datasets__ = {
     "sceneflow": SceneFlowDataset,
