@@ -3,11 +3,10 @@ import hydra
 import logging
 import torch.backends.cudnn as cudnn
 import torch.cuda
-from omegaconf import DictConfig
 from pytorch3d.loss import chamfer_distance
 from thop import profile, clever_format
-from torch.utils.data import DataLoader
 from tqdm import tqdm
+import numpy as np
 
 from models import MSNet2D, MSNet3D, calc_IoU, eval_metric
 from datasets import VoxelDSDatasetCalib
@@ -21,7 +20,7 @@ MAXDISP = 192
 cudnn.benchmark = True
 
 test_dataset = VoxelDSDatasetCalib('/work/vig/Datasets/DrivingStereo',
-                                   './filenames/DS_train_gt_calib.txt',
+                                   './filenames/DS_test_gt_calib.txt',
                                    False,
                                    [-8, 10, -3, 3, 0, 30],
                                    [3, 1.5, 0.75, 0.375])
@@ -32,20 +31,36 @@ model = MSNet2D(MAXDISP)
 # model = MSNet3D(MAXDISP)
 
 
+def calc_voxel_grid(filtered_cloud, grid_size):
+    voxel_size = 32 / grid_size
+    # quantized point values, here you will loose precision
+    xyz_q = np.floor(np.array(filtered_cloud / voxel_size)).astype(int)
+    # Empty voxel grid
+    vox_grid = np.zeros((grid_size, grid_size, grid_size))
+    offsets = np.array([int(16 / voxel_size), int(31 / voxel_size), 0])
+    xyz_offset_q = xyz_q + offsets
+    # Setting all voxels containitn a points equal to 1
+    vox_grid[xyz_offset_q[:, 0],
+    xyz_offset_q[:, 1], xyz_offset_q[:, 2]] = 1
+
+    # get back indexes of populated voxels
+    xyz_v = np.asarray(np.where(vox_grid == 1))
+    cloud_np = np.asarray([(pt - offsets) * voxel_size for pt in xyz_v.T])
+    return vox_grid, cloud_np
+
+
 def eval_model():
     if torch.cuda.is_available():
         model.cuda()
 
     state_dict = torch.load('./checkpoints/MSNet2D_DS.ckpt')['model']
     # state_dict = torch.load('./checkpoints/MSNet3D_DS.ckpt')['model']
-    '''
     new_state_dict = {}
     for k, v in state_dict.items():
         k = k[7:]
         new_state_dict[k] = v
-    '''
 
-    model.load_state_dict(state_dict, strict=True)
+    model.load_state_dict(new_state_dict, strict=True)
     model.eval()
 
     iou_dict = MetricDict()
@@ -53,28 +68,24 @@ def eval_model():
     for batch_idx, sample in enumerate(tqdm(test_dataset)):
         imgL = sample['left'][None, ...]
         imgR = sample['right'][None, ...]
-        voxel_gt = sample['voxel_grid'][-1][0]
+        voxel_gt = sample['voxel_grid'][-1]
 
         if torch.cuda.is_available():
             imgL = imgL.cuda()
             imgR = imgR.cuda()
 
         with torch.no_grad():
-            disp_est = model(imgL, imgR)[-1]
+            disp_est = model(imgL, imgR)[-1].squeeze().cpu().numpy()
             assert len(disp_est.shape) == 2
             disp_est[disp_est <= 0] -= 1.
 
         depth_est = test_dataset.f_u * 0.54 / disp_est
         cloud_est = test_dataset.calc_cloud(depth_est)
         filtered_cloud_est = test_dataset.filter_cloud(cloud_est)
-        parent_grid = None
-        for level in range(len(test_dataset.grid_sizes)):
-            if level == len(test_dataset.grid_sizes) - 1:
-                vox_grid_est, _ = test_dataset.calc_voxel_grid(filtered_cloud_est, level=level, parent_grid=parent_grid)
-                parent_grid = torch.from_numpy(vox_grid_est)
+        voxel_est = calc_voxel_grid(filtered_cloud_est, .375)
 
-        iou_dict.append(eval_metric([parent_grid], [voxel_gt], calc_IoU, depth_range=[.5, 1.]))
-        cd_dict.append(eval_metric([parent_grid], voxel_gt, eval_cd, [3, 1.5, 0.75, 0.375], depth_range=[.5, 1.]))
+        iou_dict.append(eval_metric([voxel_est], [voxel_gt], calc_IoU, depth_range=[.5, 1.]))
+        cd_dict.append(eval_metric([voxel_est], [voxel_gt], eval_cd, [3, 1.5, 0.75, 0.375], depth_range=[.5, 1.]))
 
     iou_mean = iou_dict.mean()
     cd_mean = cd_dict.mean()
