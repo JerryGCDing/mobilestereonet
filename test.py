@@ -7,6 +7,7 @@ from pytorch3d.loss import chamfer_distance
 from thop import profile, clever_format
 from tqdm import tqdm
 import numpy as np
+import time
 
 from models import MSNet2D, MSNet3D, calc_IoU, eval_metric
 from datasets import VoxelDSDatasetCalib
@@ -63,6 +64,7 @@ def eval_model():
 
     iou_dict = MetricDict()
     cd_dict = MetricDict()
+    infer_time = []
     for batch_idx, sample in enumerate(tqdm(test_dataset)):
         imgL = sample['left'][None, ...]
         imgR = sample['right'][None, ...]
@@ -72,6 +74,7 @@ def eval_model():
             imgL = imgL.cuda()
             imgR = imgR.cuda()
 
+        start = time.time()
         with torch.no_grad():
             disp_est = model(imgL, imgR)[-1].squeeze().cpu().numpy()
             assert len(disp_est.shape) == 2
@@ -81,6 +84,7 @@ def eval_model():
         cloud_est = test_dataset.calc_cloud(depth_est)
         filtered_cloud_est = test_dataset.filter_cloud(cloud_est)
         voxel_est, _ = calc_voxel_grid(filtered_cloud_est, (48, 16, 80), .375)
+        infer_time.append(time.time() - start)
 
         iou_dict.append(eval_metric([voxel_est], [voxel_gt], calc_IoU, depth_range=[.5, 1.]))
         cd_dict.append(eval_metric([voxel_est], [voxel_gt], eval_cd, [0.375], depth_range=[.5, 1.]))
@@ -89,8 +93,10 @@ def eval_model():
     cd_mean = cd_dict.mean()
 
     for k in iou_mean.keys():
-        msg = 'Depth - ' + k + ': ' + 'IoU = ' + str(iou_mean[k].tolist()) + '; ' + 'CD = ' + str(cd_mean[k].tolist())
+        msg = f'Depth - {k}: IoU = {str(iou_mean[k].tolist())}; CD = {str(cd_mean[k].tolist())}'
         logger.info(msg)
+    avg_infer = np.mean(np.array(infer_time))
+    logger.info(f'Avg_infer = {avg_infer}; FPS = {1 / avg_infer}')
 
 
 def eval_cd(pred, gt, scale):
