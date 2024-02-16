@@ -59,7 +59,7 @@ def test(args):
 
             disp_est = np.array(disp_est[top_pad:, :-right_pad], dtype=np.float32)
             name = fn.split('/')
-            fn = os.path.join("predictions", '_'.join(name[2:]))
+            fn = os.path.join("predictions", name[-1])
 
             if float(args.colored) == 1:
                 disp_est = kitti_colormap(disp_est)
