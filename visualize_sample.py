@@ -3,7 +3,7 @@ import torch.cuda
 import numpy as np
 import os
 
-from .test import calc_voxel_grid
+from test import calc_voxel_grid
 from datasets import VoxelDSDatasetCalib
 from models import MSNet2D, MSNet3D
 
