@@ -26,7 +26,7 @@ test_ds_dataset = VoxelDSDatasetCalib('/work/vig/Datasets/DrivingStereo',
                                       [-8, 10, -3, 3, 0, 30],
                                       [3, 1.5, 0.75, 0.375])
 test_kitti_dataset = VoxelKITTIDataset('/work/vig/Datasets/KITTI_VoxelFlow',
-                                       './filenames/KITTI_vox_valid.txt.txt',
+                                       './filenames/KITTI_vox_valid.txt',
                                        False,
                                        [-9, 9, -3, 3, 0, 30],
                                        [3, 1.5, 0.75, 0.375])
